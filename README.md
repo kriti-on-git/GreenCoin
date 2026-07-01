@@ -43,15 +43,15 @@ Reward Distribution
 
 # ✨ Features
 
-- 🔐 Authentication & Role Management
-- 👤 User Dashboard
-- 🚛 Collector Portal
-- ♻ Pickup Lifecycle
-- 🪙 GreenCoin Wallet
-- 🏆 Gamification Engine
-- 📈 Analytics Dashboard
-- 🛠 Admin Panel
-- 🔔 Notification System
+-  Authentication & Role Management
+-  User Dashboard
+-  Collector Portal
+-  Pickup Lifecycle
+-  GreenCoin Wallet
+-  Gamification Engine
+-  Analytics Dashboard
+-  Admin Panel
+-  Notification System
 
 ---
 
@@ -151,24 +151,26 @@ A --> B --> C --> D --> E --> F --> G
 
 ---
 
-# 🎮 Reward Flow
+## 🎮 Reward Workflow
 
 ```mermaid
 flowchart LR
 
-Device
+A["User submits e-waste"]
+--> B["Device verified"]
 
---> Verification
+B --> C["Device categorized"]
 
---> Weight & Category
+C --> D["Weight & condition evaluated"]
 
---> Coin Engine
+D --> E["GreenCoin calculation engine"]
 
---> Wallet
+E --> F["Coins credited to wallet"]
 
---> Redeem Rewards
+F --> G["User redeems rewards"]
+
+G --> H["Coupons / Vouchers / Donations"]
 ```
-
 ---
 
 # 🧩 Modules
@@ -374,17 +376,6 @@ Merge
 
 ---
 
-# ✅ Pull Request Rules
-
-Every PR must include
-
-- Working demo video
-- Tested locally
-- No failing pipeline
-- Updated documentation
-- Clean commit history
-
----
 
 # 📅 Development Roadmap
 
@@ -427,14 +418,6 @@ Every PR must include
 5. Open a Pull Request
 
 6. Attach a demo video
-
----
-
-# 👨‍💻 Team
-
-**SmartNerve**
-
-Building sustainable technology for real-world impact.
 
 ---
 
