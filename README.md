@@ -1,6 +1,3 @@
-<p align="center">
-  <img src="docs/assets/logo.png" width="140">
-
 # GreenCoin
 
 ### Rewarding Sustainability Through Smart E-Waste Management
