@@ -1,10 +1,11 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "GreenCoin Backend - E-waste pickup and recycling reward system API",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "dev": "ts-node src/index.ts"
   },
   "keywords": [],
   "author": "",
@@ -17,13 +18,7 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/jest": "^30.0.0",
     "@types/node": "^26.1.0",
-    "@types/supertest": "^7.2.0",
-    "jest": "^30.4.2",
-    "mongodb-memory-server": "^11.2.0",
-    "supertest": "^7.2.2",
-    "ts-jest": "^29.4.11",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
   }
