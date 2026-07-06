@@ -13,21 +13,23 @@ This backend implements the **Pickup Module** — the core workflow that drives 
 A pickup request moves through a strict, forward-only state machine:
 
 ```
-Requested → Accepted → Picked → Delivered → Verified → Reward Generated
+Requested → Accepted → Picked → Delivered → Verified ─┬─→ Reward Generated
+                                                       └─→ Verification Failed
 ```
 
 - **Only valid forward transitions are allowed.** Attempting to skip a step (e.g. `Requested → Delivered`) or go backward (e.g. `Delivered → Picked`) is rejected with a `400 INVALID_TRANSITION` error.
 - The state machine is implemented in [`pickup-state-machine.ts`](src/pickup/pickup-state-machine.ts) as a standalone class with a static transition map, making it easy to test and extend.
-- The `Verified → Reward Generated` step is stubbed — the verify endpoint returns `501 NOT_IMPLEMENTED` until the Rewards module is built.
+- **`Verification Failed`** is reached only when the Rewards service handoff fails after successful verification, which prevents pickups from getting silently stuck in case of network errors.
 
 ### 2. Pickup CRUD & Status Update Endpoints
 
-Full REST API for pickup management, implemented across:
+Full REST API for pickup management, implemented across the following files:
 
-- **Routes** → [`pickup.routes.ts`](src/pickup/pickup.routes.ts)
-- **Controller** → [`pickup.controller.ts`](src/pickup/pickup.controller.ts)
-- **Service** → [`pickup.service.ts`](src/pickup/pickup.service.ts)
-- **Model** → [`pickup.model.ts`](src/pickup/pickup.model.ts)
+- **Routes** → [`pickup.routes.ts`](src/pickup/pickup.routes.ts): Maps HTTP verbs and endpoints to the respective controller actions, integrating Auth and Zod validations.
+- **Controller** → [`pickup.controller.ts`](src/pickup/pickup.controller.ts): Orchestrates logic, extracts data from requests (`req.body`, `req.params`, `req.user`), checks roles, calls the service, and sends HTTP responses.
+- **Service** → [`pickup.service.ts`](src/pickup/pickup.service.ts): Handles database interactions (Mongoose) and enforces business rules/state transitions.
+- **Model** → [`pickup.model.ts`](src/pickup/pickup.model.ts): Defines the Mongoose schemas and TypeScript interfaces for Pickup and Device entities.
+- **Rewards Client** → [`rewards-client.ts`](src/pickup/rewards-client.ts): An HTTP client wrapper around native Node `fetch` used to trigger the external Rewards Service logic.
 
 | Method | Endpoint | Role | Description |
 |--------|----------|------|-------------|
@@ -36,14 +38,16 @@ Full REST API for pickup management, implemented across:
 | `GET` | `/api/v1/pickups/:id` | User/Collector/Admin | Get a specific pickup by ID |
 | `PATCH` | `/api/v1/pickups/:id/accept` | Collector | Accept a pickup (assigns collector) |
 | `PATCH` | `/api/v1/pickups/:id/status` | Collector | Update pickup status (next valid state) |
-| `PATCH` | `/api/v1/pickups/:id/verify` | — | Stubbed verification endpoint (501) |
+| `PATCH` | `/api/v1/pickups/:id/verify` | Admin | Verifies a delivered pickup and triggers Rewards |
 
-**Key business rules enforced:**
+**Key business rules enforced & Vulnerabilities fixed:**
 
 - A collector must be **assigned** to a pickup before updating its status.
 - A different collector **cannot** update a pickup they're not assigned to (`403 FORBIDDEN_NOT_ASSIGNED_COLLECTOR`).
 - A pickup that already has a collector **cannot** be accepted again (`403 FORBIDDEN_ALREADY_ASSIGNED`).
 - Users can **only** view their own pickups.
+- **(Glitch Fixed)** Added stricter collector access checks on viewing specific pickups via `GET /api/v1/pickups/:id` so they can only view pickups with a status of `Requested` or pickups explicitly assigned to them.
+- **(Vulnerability Fixed)** Added Zod validation to ensure that all `req.params.id` are valid MongoDB ObjectIds format. This prevents unhandled 500 Internal Server Error crashes (`CastError`) that can occur if an invalid format is passed.
 
 ### 3. Collection Center Management
 
@@ -63,7 +67,7 @@ Admin-only CRUD for managing e-waste collection centers:
 
 All incoming requests are validated using **Zod** schemas before reaching the controller:
 
-- [`pickup.validation.ts`](src/pickup/pickup.validation.ts) — Validates pickup creation body, query filters, and status update body.
+- [`pickup.validation.ts`](src/pickup/pickup.validation.ts) — Validates pickup creation body, query filters, status update body, and route `id` params.
 - [`collection-center.validation.ts`](src/pickup/collection-center.validation.ts) — Validates collection center creation body.
 
 The `validate()` middleware wraps any Zod schema and returns structured `400 VALIDATION_ERROR` responses with field-level error messages.
@@ -101,7 +105,7 @@ Error codes used throughout the API:
 - `NOT_FOUND` — Resource not found
 - `INVALID_TRANSITION` — Invalid state machine transition
 - `VALIDATION_ERROR` — Zod validation failure
-- `NOT_IMPLEMENTED` — Stubbed endpoint
+- `REWARDS_HANDOFF_FAILED` — Triggering rewards via external service failed
 - `INTERNAL_SERVER_ERROR` — Unhandled errors
 
 ### 7. Structured Logging
@@ -124,6 +128,11 @@ Database indexes are set on `Pickup` for fast querying:
 - `collectorId` — for collector-specific filtering
 - `status` — for status-based filtering
 
+### 9. Test Suite
+
+- **Test Suite** → [`pickup.test.ts`](tests/pickup.test.ts): Contains 14 Jest/Supertest tests spanning the complete lifecycle of Pickups. Validates restrictions on User vs Collector vs Admin endpoints, validates forward-only status updates, and comprehensively tests `verifyPickup` with Rewards successful/failure cases using mocked services.
+- Ensures logic is heavily protected against regression. 
+
 ---
 
 ## Project Structure
@@ -142,6 +151,7 @@ backend/
 │   │   ├── pickup.service.ts             # Pickup business logic
 │   │   ├── pickup.validation.ts          # Zod schemas + validate middleware
 │   │   ├── pickup-state-machine.ts       # State transition validator
+│   │   ├── rewards-client.ts             # HTTP client for triggering Reward Service
 │   │   ├── collection-center.routes.ts   # Collection center routes
 │   │   ├── collection-center.controller.ts
 │   │   ├── collection-center.service.ts
@@ -175,6 +185,7 @@ Create a `.env` file in the `backend/` directory:
 ```env
 PORT=5000
 MONGODB_URI=mongodb://localhost:27017/greencoin
+REWARDS_SERVICE_URL=http://localhost:3001/api/v1/rewards/generate
 ```
 
 ### Running the Server
@@ -186,53 +197,9 @@ npm run dev
 # Build for production
 npm run build
 node dist/index.js
-```
 
----
-
-## Example API Usage
-
-### Create a Pickup (as a User)
-
-```bash
-curl -X POST http://localhost:5000/api/v1/pickups \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer valid_user_token" \
-  -d '{
-    "pickupTime": "2026-07-10T10:00:00.000Z",
-    "device": {
-      "category": "Laptop",
-      "weight": 2.5
-    }
-  }'
-```
-
-### Accept a Pickup (as a Collector)
-
-```bash
-curl -X PATCH http://localhost:5000/api/v1/pickups/<pickup_id>/accept \
-  -H "Authorization: Bearer valid_collector_token"
-```
-
-### Update Pickup Status (as the assigned Collector)
-
-```bash
-curl -X PATCH http://localhost:5000/api/v1/pickups/<pickup_id>/status \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer valid_collector_token" \
-  -d '{ "status": "Picked" }'
-```
-
-### Create a Collection Center (as an Admin)
-
-```bash
-curl -X POST http://localhost:5000/api/v1/collection-centers \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer valid_admin_token" \
-  -d '{
-    "name": "Downtown E-Waste Hub",
-    "location": "123 Green Street, Eco City"
-  }'
+# Test (with Jest)
+npm test
 ```
 
 ---
@@ -246,3 +213,4 @@ curl -X POST http://localhost:5000/api/v1/collection-centers \
 | Database | MongoDB via Mongoose |
 | Validation | Zod |
 | Auth | Stub middleware (JWT planned) |
+| Testing | Jest & Supertest |

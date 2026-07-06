@@ -10,7 +10,8 @@ export enum PickupStatus {
   PICKED = 'Picked',
   DELIVERED = 'Delivered',
   VERIFIED = 'Verified',
-  REWARD_GENERATED = 'Reward Generated'
+  REWARD_GENERATED = 'Reward Generated',
+  VERIFICATION_FAILED = 'Verification Failed'
 }
 
 export interface IDevice extends Document {

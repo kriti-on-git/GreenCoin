@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { Pickup, Device, IPickup, IDevice, PickupStatus } from './pickup.model';
 import { PickupStateMachine } from './pickup-state-machine';
+import { triggerRewardGeneration } from './rewards-client';
 import { logger } from '../utils/logger';
 
 export class PickupService {
@@ -122,4 +123,72 @@ export class PickupService {
     logger.info(`Pickup ${pickupId} transitioned ${currentStatus} -> ${nextStatus} by collector ${collectorId}`);
     return pickup.populate('deviceId');
   }
+
+  /**
+   * Verifies a delivered pickup and triggers the Rewards module handoff.
+   *
+   * Flow:
+   * 1. Validate Delivered → Verified transition via state machine
+   * 2. Set status to Verified
+   * 3. Call Rewards service with pickup/device data
+   * 4. On success: transition to Reward Generated
+   * 5. On failure: transition to Verification Failed, throw error
+   */
+  static async verifyPickup(pickupId: string): Promise<IPickup> {
+    const pickup = await Pickup.findById(pickupId).populate<{ deviceId: IDevice }>('deviceId');
+    if (!pickup) {
+      const err: any = new Error('Pickup not found');
+      err.statusCode = 404;
+      err.errorCode = 'NOT_FOUND';
+      throw err;
+    }
+
+    // 1. Validate transition: only Delivered → Verified is allowed
+    try {
+      PickupStateMachine.assertValidTransition(pickup.status, PickupStatus.VERIFIED);
+    } catch (error: any) {
+      logger.warn(`Invalid verify transition attempt for pickup ${pickupId} from status ${pickup.status}`, { error: error.message });
+      throw error;
+    }
+
+    // 2. Transition to Verified
+    pickup.status = PickupStatus.VERIFIED;
+    await pickup.save();
+
+    // 3. Build rewards payload from pickup + populated device
+    const device = pickup.deviceId as unknown as IDevice;
+    const rewardsPayload = {
+      pickupId: pickupId,
+      userId: pickup.userId.toString(),
+      deviceId: device._id.toString(),
+      category: device.category,
+      weight: device.weight,
+    };
+
+    // 4. Call Rewards service
+    const result = await triggerRewardGeneration(rewardsPayload);
+
+    if (result.success) {
+      // 5a. Success: transition Verified → Reward Generated
+      PickupStateMachine.assertValidTransition(pickup.status, PickupStatus.REWARD_GENERATED);
+      pickup.status = PickupStatus.REWARD_GENERATED;
+      await pickup.save();
+
+      logger.info(`Pickup ${pickupId} verified and reward triggered`);
+      return pickup.populate('deviceId');
+    } else {
+      // 5b. Failure: transition Verified → Verification Failed
+      PickupStateMachine.assertValidTransition(pickup.status, PickupStatus.VERIFICATION_FAILED);
+      pickup.status = PickupStatus.VERIFICATION_FAILED;
+      await pickup.save();
+
+      logger.error(`Rewards handoff failed for pickup ${pickupId}`, { reason: result.error });
+
+      const err: any = new Error(`Rewards handoff failed: ${result.error}`);
+      err.statusCode = 502;
+      err.errorCode = 'REWARDS_HANDOFF_FAILED';
+      throw err;
+    }
+  }
 }
+

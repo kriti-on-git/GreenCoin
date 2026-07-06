@@ -6,6 +6,12 @@ const objectIdValidator = z.string().refine((val) => mongoose.Types.ObjectId.isV
   message: 'Invalid ObjectId format',
 });
 
+export const idParamSchema = z.object({
+  params: z.object({
+    id: objectIdValidator,
+  }),
+});
+
 export const createPickupSchema = z.object({
   body: z.object({
     pickupTime: z.string().datetime({ message: 'pickupTime must be a valid ISO 8601 datetime' }),

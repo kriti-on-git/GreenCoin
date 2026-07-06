@@ -9,8 +9,10 @@ export class PickupStateMachine {
     [PickupStatus.ACCEPTED]: [PickupStatus.PICKED],
     [PickupStatus.PICKED]: [PickupStatus.DELIVERED],
     [PickupStatus.DELIVERED]: [PickupStatus.VERIFIED],
-    [PickupStatus.VERIFIED]: [PickupStatus.REWARD_GENERATED],
-    [PickupStatus.REWARD_GENERATED]: [] // Terminal state
+    [PickupStatus.VERIFIED]: [PickupStatus.REWARD_GENERATED, PickupStatus.VERIFICATION_FAILED],
+    [PickupStatus.REWARD_GENERATED]: [], // Terminal state
+    // TODO: Consider allowing VerificationFailed → Verified for manual retry
+    [PickupStatus.VERIFICATION_FAILED]: [] // Terminal state — manual retry handled outside state machine
   };
 
   /**

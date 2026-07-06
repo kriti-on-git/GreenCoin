@@ -50,8 +50,19 @@ export class PickupController {
         });
       }
       
-      // Additional check for collectors if needed (they should only see accepted pickups assigned to them, or maybe all requested)
-      // We'll enforce stricter collector checks in Task 2.
+      // Check if collector is authorized to view this pickup
+      if (role === 'collector') {
+        const isRequested = pickup.status === 'Requested';
+        const isAssignedToMe = pickup.collectorId?.toString() === userId;
+
+        if (!isRequested && !isAssignedToMe) {
+          return res.status(403).json({
+            success: false,
+            error: 'FORBIDDEN',
+            message: 'You are not authorized to view this pickup',
+          });
+        }
+      }
 
       res.status(200).json({
         success: true,
@@ -144,23 +155,26 @@ export class PickupController {
     }
   }
 
-  static async verifyPickupStub(req: Request, res: Response, next: NextFunction) {
+  // TODO: Confirm with team — should the allowed role be 'admin' only, or also
+  // 'recycler' / 'collection-center-staff'? Defaulting to 'admin' for now.
+  static async verifyPickup(req: Request, res: Response, next: NextFunction) {
     try {
-      // TODO: Implement verification logic and trigger Rewards module
-      /* 
-       * Expected Payload to send to Rewards Module:
-       * {
-       *   pickupId: req.params.id,
-       *   userId: '<pickup.userId>',
-       *   deviceId: '<pickup.deviceId>',
-       *   category: '<device.category>',
-       *   weight: <device.weight>
-       * }
-       */
-      res.status(501).json({
-        success: false,
-        error: 'NOT_IMPLEMENTED',
-        message: 'Verify endpoint is stubbed and not yet implemented',
+      const id = req.params.id as string;
+      const role = req.user?.role;
+
+      if (role !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN',
+          message: 'Only admins can verify pickups',
+        });
+      }
+
+      const pickup = await PickupService.verifyPickup(id);
+
+      res.status(200).json({
+        success: true,
+        data: pickup,
       });
     } catch (error) {
       next(error);
