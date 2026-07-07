@@ -140,10 +140,20 @@ Database indexes are set on `Pickup` for fast querying:
 ```
 backend/
 ├── src/
-│   ├── index.ts                          # Express app setup & MongoDB connection
+│   ├── index.ts                          # Express app setup, routing & execution
+│   ├── config/
+│   │   └── db.ts                         # MongoDB connection setup
 │   ├── middlewares/
-│   │   ├── auth.middleware.ts             # Stub auth (Bearer token → user context)
-│   │   └── error.middleware.ts            # Centralized error handler
+│   │   ├── auth.middleware.ts            # Real JWT authentication middleware
+│   │   └── error.middleware.ts           # Centralized error handler
+│   ├── auth/
+│   │   ├── auth.controller.ts            # Register & login request handlers
+│   │   ├── auth.routes.ts                # Auth route definitions
+│   │   ├── auth.service.ts               # Password hashing & auth business logic
+│   │   ├── auth.validation.ts            # Zod schemas for auth inputs
+│   │   └── jwt.util.ts                   # Token generation and verification
+│   ├── users/
+│   │   └── user.model.ts                 # User Mongoose schema & interface
 │   ├── pickup/
 │   │   ├── pickup.model.ts               # Mongoose schemas & models (Pickup, Device, CollectionCenter)
 │   │   ├── pickup.routes.ts              # Pickup route definitions
@@ -180,11 +190,12 @@ npm install
 
 ### Environment Variables
 
-Create a `.env` file in the `backend/` directory:
+Create a `.env` file in the `backend/` directory (you can use `.env.example` as a template):
 
 ```env
-PORT=5000
+PORT=3000
 MONGODB_URI=mongodb://localhost:27017/greencoin
+JWT_SECRET=your_super_secret_jwt_key_here
 REWARDS_SERVICE_URL=http://localhost:3001/api/v1/rewards/generate
 ```
 
@@ -212,5 +223,5 @@ npm test
 | Framework | Express 5 |
 | Database | MongoDB via Mongoose |
 | Validation | Zod |
-| Auth | Stub middleware (JWT planned) |
-| Testing | Jest & Supertest |
+| Auth | Real JWT middleware with bcrypt hashing |
+| Testing | Jest, Supertest & mongodb-memory-server |

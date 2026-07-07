@@ -5,11 +5,14 @@ import pickupRoutes from './pickup/pickup.routes';
 import { logger } from './utils/logger';
 
 import collectionCenterRoutes from './pickup/collection-center.routes';
+import authRoutes from './auth/auth.routes';
+import { connectDB } from './config/db';
 
 const app = express();
 app.use(express.json());
 
 // Routes
+app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/pickups', pickupRoutes);
 app.use('/api/v1/collection-centers', collectionCenterRoutes);
 
@@ -23,8 +26,7 @@ export { app };
 
 const startServer = async () => {
   try {
-    await mongoose.connect(MONGODB_URI);
-    logger.info('Connected to MongoDB');
+    await connectDB();
     
     app.listen(PORT, () => {
       logger.info(`Server listening on port ${PORT}`);
