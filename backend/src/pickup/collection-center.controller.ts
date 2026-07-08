@@ -16,17 +16,6 @@ export class CollectionCenterController {
 
   static async createCollectionCenter(req: Request, res: Response, next: NextFunction) {
     try {
-      const role = req.user?.role;
-      
-      // Admin only check
-      if (role !== 'admin') {
-        return res.status(403).json({
-          success: false,
-          error: 'FORBIDDEN',
-          message: 'Only admins can create collection centers',
-        });
-      }
-
       const { name, location } = req.body;
       const center = await CollectionCenterService.createCollectionCenter(name, location);
 

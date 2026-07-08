@@ -40,3 +40,13 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     next(error);
   }
 };
+
+export const logout = async (req: Request, res: Response, next: NextFunction) => {
+  // True server-side token invalidation isn't in scope for this stateless JWT setup.
+  // This endpoint serves as a no-op that returns 200, but the actual "logout" is
+  // the client discarding the token.
+  res.status(200).json({
+    success: true,
+    message: 'Logged out successfully. Please discard the token on the client.',
+  });
+};

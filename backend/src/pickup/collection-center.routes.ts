@@ -3,6 +3,7 @@ import { CollectionCenterController } from './collection-center.controller';
 import { validate } from './pickup.validation';
 import { createCollectionCenterSchema } from './collection-center.validation';
 import { requireAuth } from '../middlewares/auth.middleware';
+import { requireRole } from '../middlewares/rbac.middleware';
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.get(
 router.post(
   '/',
   requireAuth,
+  requireRole('admin'),
   validate(createCollectionCenterSchema),
   CollectionCenterController.createCollectionCenter
 );

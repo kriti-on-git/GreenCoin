@@ -7,6 +7,8 @@ interface TokenPayload {
   role: string;
 }
 
+// Note: Keep JWT expiry at 1 hour for MVP. Refresh tokens are a deliberate Day-2
+// descope per the team's roadmap and are intentionally not implemented here.
 export const generateToken = (payload: TokenPayload): string => {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
 };

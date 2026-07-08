@@ -2,10 +2,11 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "GreenCoin Backend - E-waste pickup and recycling reward system API",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
     "test": "jest"
   },
   "keywords": [],

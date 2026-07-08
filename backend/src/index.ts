@@ -6,6 +6,7 @@ import { logger } from './utils/logger';
 
 import collectionCenterRoutes from './pickup/collection-center.routes';
 import authRoutes from './auth/auth.routes';
+import userRoutes from './users/user.routes';
 import { connectDB } from './config/db';
 
 const app = express();
@@ -13,6 +14,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/pickups', pickupRoutes);
 app.use('/api/v1/collection-centers', collectionCenterRoutes);
 

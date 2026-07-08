@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PickupController } from './pickup.controller';
 import { validate, createPickupSchema, getPickupsQuerySchema, updatePickupStatusSchema, idParamSchema } from './pickup.validation';
 import { requireAuth } from '../middlewares/auth.middleware';
+import { requireRole } from '../middlewares/rbac.middleware';
 
 const router = Router();
 
@@ -33,6 +34,7 @@ router.get(
 router.patch(
   '/:id/accept',
   requireAuth,
+  requireRole('collector'),
   validate(idParamSchema),
   PickupController.acceptPickup
 );
@@ -41,6 +43,7 @@ router.patch(
 router.patch(
   '/:id/status',
   requireAuth,
+  requireRole('collector'),
   validate(idParamSchema),
   validate(updatePickupStatusSchema),
   PickupController.updatePickupStatus
@@ -50,6 +53,7 @@ router.patch(
 router.patch(
   '/:id/verify',
   requireAuth,
+  requireRole('admin'),
   validate(idParamSchema),
   PickupController.verifyPickup
 );

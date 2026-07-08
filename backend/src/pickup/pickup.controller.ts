@@ -108,14 +108,9 @@ export class PickupController {
     try {
       const id = req.params.id as string;
       const collectorId = req.user?.id;
-      const role = req.user?.role;
 
-      if (role !== 'collector' || !collectorId) {
-        return res.status(403).json({
-          success: false,
-          error: 'FORBIDDEN',
-          message: 'Only collectors can accept pickups',
-        });
+      if (!collectorId) {
+        return res.status(401).json({ success: false, error: 'UNAUTHORIZED', message: 'User context missing' });
       }
 
       const pickup = await PickupService.acceptPickup(id, collectorId);
@@ -134,14 +129,9 @@ export class PickupController {
       const id = req.params.id as string;
       const { status } = req.body;
       const collectorId = req.user?.id;
-      const role = req.user?.role;
 
-      if (role !== 'collector' || !collectorId) {
-        return res.status(403).json({
-          success: false,
-          error: 'FORBIDDEN',
-          message: 'Only collectors can update pickup status',
-        });
+      if (!collectorId) {
+        return res.status(401).json({ success: false, error: 'UNAUTHORIZED', message: 'User context missing' });
       }
 
       const pickup = await PickupService.updatePickupStatus(id, collectorId, status);
@@ -160,15 +150,6 @@ export class PickupController {
   static async verifyPickup(req: Request, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;
-      const role = req.user?.role;
-
-      if (role !== 'admin') {
-        return res.status(403).json({
-          success: false,
-          error: 'FORBIDDEN',
-          message: 'Only admins can verify pickups',
-        });
-      }
 
       const pickup = await PickupService.verifyPickup(id);
 
