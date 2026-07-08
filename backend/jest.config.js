@@ -3,6 +3,10 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.ts', '**/src/**/*.test.ts'],
+  testEnvironmentOptions: {
+    // Ensure rate-limiting middleware in index.ts is bypassed during tests.
+    env: { NODE_ENV: 'test' },
+  },
   moduleFileExtensions: ['ts', 'js', 'json'],
   transform: {
     '^.+\\.ts$': ['ts-jest', {
