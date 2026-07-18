@@ -51,3 +51,4 @@ mongo-data/
 
 # Antigravity / AI tool local state (if any gets generated)
 .antigravity/
+task.md

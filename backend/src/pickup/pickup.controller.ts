@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { PickupService } from './pickup.service';
 import { logger } from '../utils/logger';
+import { dispatchEvent, EventType } from '../gamification';
 
 export class PickupController {
   static async createPickup(req: Request, res: Response, next: NextFunction) {
@@ -152,6 +153,17 @@ export class PickupController {
       const id = req.params.id as string;
 
       const pickup = await PickupService.verifyPickup(id);
+      
+      const device = pickup.deviceId as any;
+      dispatchEvent(EventType.PICKUP_VERIFIED, {
+        userId: pickup.userId.toString(),
+        pickupId: pickup._id.toString(),
+        collectorId: pickup.collectorId?.toString() || '',
+        deviceId: device._id.toString(),
+        category: device.category,
+        weight: device.weight,
+        timestamp: new Date()
+      });
 
       res.status(200).json({
         success: true,

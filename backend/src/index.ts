@@ -10,6 +10,15 @@ import { logger } from './utils/logger';
 import collectionCenterRoutes from './pickup/collection-center.routes';
 import authRoutes from './auth/auth.routes';
 import userRoutes from './users/user.routes';
+import walletRoutes from './gamification/api/wallet-routes';
+import leaderboardRoutes from './gamification/api/leaderboard-routes';
+import rewardRoutes from './gamification/api/reward-routes';
+import badgeRoutes from './gamification/api/badge-routes';
+import profileRoutes from './gamification/api/profile-routes';
+import challengeRoutes from './gamification/api/challenge-routes';
+import levelRoutes from './gamification/api/level-routes';
+import statisticsRoutes from './gamification/api/statistics-routes';
+import { initializeGamificationEngines } from './gamification';
 import { connectDB } from './config/db';
 
 const app = express();
@@ -89,6 +98,14 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/pickups', pickupRoutes);
 app.use('/api/v1/collection-centers', collectionCenterRoutes);
+app.use('/api/v1/gamification/wallet', walletRoutes);
+app.use('/api/v1/gamification/leaderboard', leaderboardRoutes);
+app.use('/api/v1/gamification/rewards', rewardRoutes);
+app.use('/api/v1/gamification/badges', badgeRoutes);
+app.use('/api/v1/gamification/profile', profileRoutes);
+app.use('/api/v1/gamification/challenges', challengeRoutes);
+app.use('/api/v1/gamification/levels', levelRoutes);
+app.use('/api/v1/gamification/statistics', statisticsRoutes);
 
 // ── Error Handling Middleware (must be last) ───────────────────────────────────
 app.use(errorHandler);
@@ -100,6 +117,9 @@ export { app };
 const startServer = async () => {
   try {
     await connectDB();
+    
+    // Initialize Gamification Event Listeners and Database Seeding
+    await initializeGamificationEngines();
 
     app.listen(PORT, () => {
       logger.info(`Server listening on port ${PORT}`);
