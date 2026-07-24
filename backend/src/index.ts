@@ -1,31 +1,126 @@
+import 'dotenv/config';
 import express from 'express';
-import mongoose from 'mongoose';
+import helmet from 'helmet';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { errorHandler } from './middlewares/error.middleware';
 import pickupRoutes from './pickup/pickup.routes';
 import { logger } from './utils/logger';
 
 import collectionCenterRoutes from './pickup/collection-center.routes';
+import authRoutes from './auth/auth.routes';
+import userRoutes from './users/user.routes';
+import walletRoutes from './gamification/api/wallet-routes';
+import leaderboardRoutes from './gamification/api/leaderboard-routes';
+import rewardRoutes from './gamification/api/reward-routes';
+import badgeRoutes from './gamification/api/badge-routes';
+import profileRoutes from './gamification/api/profile-routes';
+import challengeRoutes from './gamification/api/challenge-routes';
+import levelRoutes from './gamification/api/level-routes';
+import statisticsRoutes from './gamification/api/statistics-routes';
+import { initializeGamificationEngines } from './gamification';
+import { connectDB } from './config/db';
 
 const app = express();
-app.use(express.json());
 
-// Routes
+// ── Security headers ─────────────────────────────────────────────────────────
+// Sets X-Content-Type-Options, X-Frame-Options, removes X-Powered-By, etc.
+app.use(helmet());
+
+// ── CORS ─────────────────────────────────────────────────────────────────────
+// Restrict cross-origin requests to the known frontend origin.
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+app.use(cors({ origin: FRONTEND_URL, credentials: true }));
+
+// ── Body parsing (size-limited to defend against large payload DoS) ───────────
+app.use(express.json({ limit: '100kb' }));
+
+// ── NoSQL injection sanitization ──────────────────────────────────────────────
+// express-mongo-sanitize is incompatible with Express 5 (req.query is getter-only
+// in Express 5's router; the library crashes trying to assign to it).
+// Instead we apply a surgical inline sanitizer to req.body and req.params only.
+// req.query safety is enforced by Zod schemas at every route boundary.
+const stripMongoOperators = (obj: Record<string, unknown>): Record<string, unknown> => {
+  if (typeof obj !== 'object' || obj === null) return obj;
+  return Object.fromEntries(
+    Object.entries(obj)
+      .filter(([key]) => !key.startsWith('$') && !key.includes('.'))
+      .map(([key, val]) => [
+        key,
+        typeof val === 'object' && val !== null
+          ? stripMongoOperators(val as Record<string, unknown>)
+          : val,
+      ])
+  );
+};
+
+app.use((req, _res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    req.body = stripMongoOperators(req.body as Record<string, unknown>);
+  }
+  if (req.params && typeof req.params === 'object') {
+    req.params = stripMongoOperators(req.params as Record<string, unknown>) as Record<string, string>;
+  }
+  next();
+});
+
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+// Rate limiters use an in-memory store — disable in test env to prevent the
+// counter persisting between test cases and exhausting the window mid-suite.
+const isTest = process.env.NODE_ENV === 'test';
+
+// Strict limiter on auth endpoints (10 req / 15 min per IP) to slow brute-force.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? Infinity : 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'TOO_MANY_ATTEMPTS',
+    message: 'Too many attempts. Please try again later.',
+  },
+});
+app.use('/api/v1/auth/login', authLimiter);
+app.use('/api/v1/auth/register', authLimiter);
+
+// Generous general limiter (300 req / 15 min) across the rest of the API.
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? Infinity : 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/v1', generalLimiter);
+
+// ── Routes ────────────────────────────────────────────────────────────────────
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/pickups', pickupRoutes);
 app.use('/api/v1/collection-centers', collectionCenterRoutes);
+app.use('/api/v1/gamification/wallet', walletRoutes);
+app.use('/api/v1/gamification/leaderboard', leaderboardRoutes);
+app.use('/api/v1/gamification/rewards', rewardRoutes);
+app.use('/api/v1/gamification/badges', badgeRoutes);
+app.use('/api/v1/gamification/profile', profileRoutes);
+app.use('/api/v1/gamification/challenges', challengeRoutes);
+app.use('/api/v1/gamification/levels', levelRoutes);
+app.use('/api/v1/gamification/statistics', statisticsRoutes);
 
-// Error Handling Middleware (must be the last middleware)
+// ── Error Handling Middleware (must be last) ───────────────────────────────────
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/greencoin';
 
 export { app };
 
 const startServer = async () => {
   try {
-    await mongoose.connect(MONGODB_URI);
-    logger.info('Connected to MongoDB');
+    await connectDB();
     
+    // Initialize Gamification Event Listeners and Database Seeding
+    await initializeGamificationEngines();
+
     app.listen(PORT, () => {
       logger.info(`Server listening on port ${PORT}`);
     });

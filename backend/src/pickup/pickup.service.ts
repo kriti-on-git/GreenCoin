@@ -26,7 +26,11 @@ export class PickupService {
     });
     await pickup.save();
 
-    return pickup.populate('deviceId');
+    logger.info(`[createPickup] Saved pickup _id=${pickup._id}, fetching with populate...`);
+
+    // 3. Re-fetch with populated device (more reliable than instance.populate)
+    const populated = await Pickup.findById(pickup._id).populate('deviceId').exec();
+    return populated!;
   }
 
   /**
@@ -86,7 +90,7 @@ export class PickupService {
     await pickup.save();
     
     logger.info(`Pickup ${pickupId} transitioned Requested -> Accepted by collector ${collectorId}`);
-    return pickup.populate('deviceId');
+    return await pickup.populate('deviceId');
   }
 
   /**
@@ -121,7 +125,7 @@ export class PickupService {
     await pickup.save();
 
     logger.info(`Pickup ${pickupId} transitioned ${currentStatus} -> ${nextStatus} by collector ${collectorId}`);
-    return pickup.populate('deviceId');
+    return await pickup.populate('deviceId');
   }
 
   /**
@@ -175,7 +179,7 @@ export class PickupService {
       await pickup.save();
 
       logger.info(`Pickup ${pickupId} verified and reward triggered`);
-      return pickup.populate('deviceId');
+      return await pickup.populate('deviceId');
     } else {
       // 5b. Failure: transition Verified → Verification Failed
       PickupStateMachine.assertValidTransition(pickup.status, PickupStatus.VERIFICATION_FAILED);
